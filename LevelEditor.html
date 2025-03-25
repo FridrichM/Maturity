@@ -1,0 +1,199 @@
+<!-- Made for editing the level.json file -->
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Platform Editor</title>
+    <style>
+        canvas {
+            border: 1px solid black;
+            display: block;
+            margin: 0 auto;
+            background: linear-gradient(#ffffff, #f0f0f0);
+        }
+        body { text-align: center; }
+    </style>
+</head>
+<body>
+    <canvas id="editor" width="4096" height="2048"></canvas>
+    <div>
+        <button id="export">Export to JSON</button>
+        <input type="file" id="import" accept=".json">
+    </div>
+    <script>
+        const canvas = document.getElementById('editor');
+        const ctx = canvas.getContext('2d');
+        const platforms = [];
+        const history = [];
+        let startX, startY, isDrawing = false, selectedPlatform = null, isMoving = false, isResizing = false;
+
+        const gridSize = 16; // Define grid size
+
+        // Snap value to grid
+        function snapToGrid(value) {
+            return Math.round(value / gridSize) * gridSize;
+        }
+
+        // Draw grid
+        function drawGrid() {
+            ctx.beginPath();
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+            }
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+            }
+            ctx.strokeStyle = '#cccccc';
+            ctx.stroke();
+        }
+
+        // Redraw all platforms and grid
+        function redrawCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawGrid();
+            platforms.forEach(platform => {
+                ctx.fillRect(platform.x, platform.y, platform.width, platform.height);
+            });
+        }
+
+        // Handle drawing platforms
+        canvas.addEventListener('mousedown', (e) => {
+            startX = snapToGrid(e.offsetX);
+            startY = snapToGrid(e.offsetY);
+
+            // Check if clicking on an existing platform
+            selectedPlatform = platforms.find(platform =>
+                e.offsetX >= platform.x &&
+                e.offsetX <= platform.x + platform.width &&
+                e.offsetY >= platform.y &&
+                e.offsetY <= platform.y + platform.height
+            );
+
+            if (selectedPlatform) {
+                if (e.ctrlKey) {
+                    isResizing = true;
+                } else {
+                    isMoving = true;
+                }
+            } else {
+                isDrawing = true;
+            }
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (isDrawing) {
+                let width = snapToGrid(e.offsetX) - startX;
+                let height = snapToGrid(e.offsetY) - startY;
+
+                let normalizedX = width < 0 ? startX + width : startX;
+                let normalizedY = height < 0 ? startY + height : startY;
+                width = Math.abs(width);
+                height = Math.abs(height);
+
+                redrawCanvas();
+                ctx.strokeRect(normalizedX, normalizedY, width, height);
+            } else if (isMoving && selectedPlatform) {
+                const dx = snapToGrid(e.offsetX) - startX;
+                const dy = snapToGrid(e.offsetY) - startY;
+                selectedPlatform.x += dx;
+                selectedPlatform.y += dy;
+                startX = snapToGrid(e.offsetX);
+                startY = snapToGrid(e.offsetY);
+                redrawCanvas();
+            } else if (isResizing && selectedPlatform) {
+                const width = snapToGrid(e.offsetX) - selectedPlatform.x;
+                const height = snapToGrid(e.offsetY) - selectedPlatform.y;
+                selectedPlatform.width = width > 0 ? width : gridSize;
+                selectedPlatform.height = height > 0 ? height : gridSize;
+                redrawCanvas();
+            }
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            if (isDrawing) {
+                let width = snapToGrid(e.offsetX) - startX;
+                let height = snapToGrid(e.offsetY) - startY;
+
+                let normalizedX = width < 0 ? startX + width : startX;
+                let normalizedY = height < 0 ? startY + height : startY;
+                width = Math.abs(width);
+                height = Math.abs(height);
+
+                platforms.push({ x: normalizedX, y: normalizedY, width: width, height: height });
+                history.push([...platforms]);
+                isDrawing = false;
+            }
+
+            isMoving = false;
+            isResizing = false;
+            redrawCanvas();
+        });
+
+        // Handle double click to erase
+        canvas.addEventListener('dblclick', (e) => {
+            const platformIndex = platforms.findIndex(platform =>
+                e.offsetX >= platform.x &&
+                e.offsetX <= platform.x + platform.width &&
+                e.offsetY >= platform.y &&
+                e.offsetY <= platform.y + platform.height
+            );
+
+            if (platformIndex !== -1) {
+                platforms.splice(platformIndex, 1);
+                history.push([...platforms]);
+                redrawCanvas();
+            }
+        });
+
+        // Handle Ctrl+Z for undo
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === 'z') {
+                if (history.length > 0) {
+                    history.pop();
+                    platforms.splice(0, platforms.length, ...(history[history.length - 1] || []));
+                    redrawCanvas();
+                }
+            }
+        });
+
+        // Export to JSON
+        document.getElementById('export').addEventListener('click', () => {
+            const json = JSON.stringify({ platforms }, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'level.json';
+            a.click();
+        });
+
+        // Import from JSON
+        document.getElementById('import').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    try {
+                        const data = JSON.parse(event.target.result);
+                        if (data.platforms) {
+                            platforms.splice(0, platforms.length, ...data.platforms); // Replace all platforms
+                            history.push([...platforms]); // Save for undo
+                            redrawCanvas();
+                        } else {
+                            alert('Invalid JSON format!');
+                        }
+                    } catch (error) {
+                        alert('Error parsing JSON file!');
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        // Initial draw
+        redrawCanvas();
+    </script>
+</body>
+</html>
