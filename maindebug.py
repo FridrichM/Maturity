@@ -9,7 +9,7 @@ ROOT_DIR = os.path.dirname(__file__)  # Automatically gets the script's director
 LEVEL_PATH = os.path.join(ROOT_DIR, 'level.json')  # Relative path to the file
 # === Constants === #
 WINDOW_WIDTH, WINDOW_HEIGHT = 800, 600  # Viewport dimensions
-WORLD_WIDTH, WORLD_HEIGHT = 4069, 2048  # World dimensions
+WORLD_WIDTH, WORLD_HEIGHT = 4096, 2048  # World dimensions
 SKYBOX_HEIGHT = 50  # Player cannot exceed this height vertically
 # Colors
 COLORS = {
@@ -21,7 +21,7 @@ COLORS = {
 
 # Player stats
 PLAYER_STATS = {
-    "size": 15,  # Player dimensions
+    "size": 16,  # Player dimensions
     "start_pos": [200, 200],  # Starting position
     "speed": 3.5,  # Normal movement speed
     "dash_speed": 9,  # Dash movement speed
